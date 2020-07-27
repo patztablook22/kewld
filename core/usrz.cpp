@@ -120,6 +120,44 @@ uint8_t usrz::omg::gg()
 	return val[2];
 }
 
+std::wstring usrz::omg::gv()
+{
+	std::wstring rtn;
+	switch (val[0]) {
+	default:
+		rtn += L'-';
+		break;
+	case 1:
+		rtn += L'o';
+		break;
+	case 2:
+		rtn += L'O';
+	}
+	switch (val[1]) {
+	default:
+		rtn += L'-';
+		break;
+	case 1:
+		rtn += L'm';
+		break;
+	case 2:
+		rtn += L'M';
+		break;
+	}
+	switch (val[2]) {
+	default:
+		rtn += L'-';
+		break;
+	case 1:
+		rtn += L'g';
+		break;
+	case 2:
+		rtn += L'G';
+		break;
+	}
+	return rtn;
+}
+
 void usrz::omg::operator=(usrz::omg permz)
 {
 	val[0] = permz.go();

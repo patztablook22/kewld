@@ -4,7 +4,7 @@
  * "lol imma waste my time" ~ patz, d6022
  */
 
-#define VERSION 96	// editing diz may cause unexpected behaviour
+#define VERSION 97	// editing diz may cause unexpected behaviour
 
 // needed libz:
 // #include "libz/ur_package_manager.hpp"
@@ -33,6 +33,8 @@ int main(int argc, const char *argv[])
 	}
 
 	umask(077);
+	signal(SIGPIPE, SIG_IGN);
+	signal(SIGTERM, core::quit);
 	core::cfg.init();
 	core::usrz.init();
 	core::serv.init();

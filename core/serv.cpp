@@ -172,7 +172,7 @@ void serv::handler::sniffer()
 		}
 		*this << L"kk";
 		*this >> stg;
-		if (stg.size() < 3 || stg.size() > 15 || !iz_k(stg) || stg.find_first_of(L" /") != std::wstring::npos || stg == L"kewl" || stg == L"serv") {
+		if (stg.size() < 3 || stg.size() > 15 || !iz_k(stg) || stg.find_first_of(L" /\\") != std::wstring::npos || stg == L"kewl" || stg == L"serv") {
 			delete this;
 			return;
 		}
@@ -206,7 +206,7 @@ void serv::handler::sniffer()
 		switch (core::serv.nexus.join(stg, this)) {
 		case 0:
 			usr = stg;
-			*this << L"k" + usr;
+			*this << L"k" + usrdata->permz.gv() + usr;
 			break;
 		case 1:
 			*this << L"f";
@@ -343,7 +343,18 @@ void serv::handler::sniffer()
 				}
 			} else {
 				gettimeofday(&tmp, NULL);
-				if (1000000 * (tmp.tv_sec - tm.tv_sec) + tmp.tv_usec - tm.tv_usec >= 1000 * core::cfg.flood_delay.gval())
+				int s = tmp.tv_sec - tm.tv_sec;
+				bool elapsed;
+				if (s < core::cfg.flood_delay.gval() / 1000)
+					elapsed = false;
+				else if (s > core::cfg.flood_delay.gval() / 1000 + 1)
+					elapsed = true;
+				else if (1000 * s + (tmp.tv_usec - tm.tv_usec) / 1000 >= core::cfg.flood_delay.gval())
+					elapsed = true;
+				else
+					elapsed = false;
+
+				if (elapsed)
 					core::serv.nexus << buf2;
 				else
 					*this << core::serv::msg(L"serv", core::cfg.flood_msg.gval());
@@ -532,6 +543,7 @@ int serv::serve(int port, int clientz)
 	struct sockaddr_in addr;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
+	setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &tmp, sizeof(tmp));
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;

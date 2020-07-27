@@ -227,6 +227,7 @@ public:
 		omg(), omg(std::wstring);
 		bool iz_k();
 		uint8_t go(), gm(), gg();
+		std::wstring gv();
 		void operator=(omg);
 	private:
 		uint8_t val[3];

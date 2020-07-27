@@ -29,40 +29,7 @@ public:
 		if (arg.size() != 1)
 			return 2;
 		core::serv::handler *diz = core::serv.nexus.diz_handler();
-		std::wstring permz;
-		switch (diz->usrdata->permz.go()) {
-		default:
-			permz += L'-';
-			break;
-		case 1:
-			permz += L'o';
-			break;
-		case 2:
-			permz += L'O';
-		}
-		switch (diz->usrdata->permz.gm()) {
-		default:
-			permz += L'-';
-			break;
-		case 1:
-			permz += L'm';
-			break;
-		case 2:
-			permz += L'M';
-			break;
-		}
-		switch (diz->usrdata->permz.gg()) {
-		default:
-			permz += L'-';
-			break;
-		case 1:
-			permz += L'g';
-			break;
-		case 2:
-			permz += L'G';
-			break;
-		}
-		*diz << core::serv::msg(L"serv", L"ur permissionz: " + permz);
+		*diz << core::serv::msg(L"serv", L"ur permissionz: \\1" + diz->usrdata->permz.gv());
 		return 0;
 	}
 } omg;

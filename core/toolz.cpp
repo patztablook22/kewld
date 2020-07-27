@@ -1,9 +1,9 @@
 bool iz_k(wint_t chk)
 {
 	if ( \
-		(chk >= 32 && chk <= 176) /* standard ASCII without da weird mess at beginning*/ || \
-		(chk >= 192 && chk != 215 && chk != 247 && chk <= 591) /* some čžech crap */ || \
-		(chk >= 1025 && chk <= 1105) /* cука блять etc. xd */ \
+		(chk >= 32 && chk <= 591) /* ASCII etc. */ || \
+		(chk >= 1025 && chk <= 1105) /* cука блять etc. xd */ || \
+		(chk >= 9472 && chk <= 9679) /* box-drawing charz etc. */ \
 		)
 		return true;
 	return false;
@@ -65,11 +65,9 @@ void daemonize()
 		exit(EXIT_FAILURE);
 	}
 
-	core::log.psss();
-
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
-	signal(SIGTERM, quit);
+	core::log.psss();
 
 	pid = fork();
 	if (pid < 0) {
