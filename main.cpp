@@ -4,7 +4,7 @@
  * "lol imma waste my time" ~ patz, d6022
  */
 
-#define VERSION 98	// editing diz may cause unexpected behaviour
+#define VERSION 99	// editing diz may cause unexpected behaviour
 
 // needed libz:
 // #include "libz/ur_package_manager.hpp"

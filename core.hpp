@@ -211,6 +211,16 @@ public:
 		void operator<<(std::wstring);
 		bool val;
 	} registered_only;
+
+	class docfd: public sub_cfg {
+	public:
+		docfd();
+		void gval(std::vector<std::wstring> &);
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		std::vector<std::wstring> val;
+	} docfd;
 } cfg;
 
 /*********************************************************************************************/
@@ -267,7 +277,7 @@ public:
 	void listener();
 	class msg {
 	public:
-		msg(), msg(std::wstring), msg(std::wstring, std::wstring);
+		msg(), msg(std::wstring, std::wstring);
 		std::wstring gusr(), gbody(), gtrg();
 		bool gvalid();
 		void operator=(msg);

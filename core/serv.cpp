@@ -37,51 +37,6 @@ serv::msg::msg()
 {
 }
 
-serv::msg::msg(std::wstring input)
-:valid(false)
-{
-	int pos = input.find(32);
-	if (pos == std::wstring::npos || pos == 0 || pos == input.size() - 1 || !core::iz_k(input))
-		return;
-	usr = input.substr(0, pos);
-	std::wstring tmp = input.substr(pos + 1, input.size() - pos - 1);
-	wint_t last = 32;
-	for (int i = 0; i < tmp.size(); i++) {
-		wint_t ch = tmp[i];
-		switch (ch) {
-		case L'\\':
-			i++;
-			switch (tmp[i]) {
-			case L'\\':
-				body += L"\\\\";
-				last = L'\\';
-				break;
-			case L'"':
-				body += L"\\\"";
-				last = L'"';
-				break;
-			}
-			break;
-		case 32:
-			if (last == 32)
-				break;
-		default:
-			body += ch;
-			last = ch;
-			break;
-		}
-	}
-	if (body.size() == 0 || body.size() > 255)
-		return;
-	if (body[0] == L'@') {
-		pos = body.find(32);
-		if (pos == -1)
-			pos = body.size();
-		trg = body.substr(1, pos - 1);
-	}
-	valid = true;
-}
-
 serv::msg::msg(std::wstring da_usr, std::wstring da_body)
 :valid(false)
 {
@@ -89,12 +44,36 @@ serv::msg::msg(std::wstring da_usr, std::wstring da_body)
 		return;
 	usr = da_usr;
 	body = da_body;
-	if (body[0] == '@') {
-		int pos = body.find(32);
-		if (pos == std::wstring::npos)
-			pos = body.size();
-		trg = body.substr(1, pos - 1);
+	bool trg_existz = false;
+	for (int i = 0; i < da_body.size(); i++) {
+		wint_t ch = da_body[i];
+		switch (ch) {
+		case L'\\':
+			i++;
+			switch (da_body[i]) {
+			case L'\\':
+			case L'/':
+			case L'"':
+				goto finish;
+			default:
+				break;
+			}
+		case 32:
+			if (trg_existz)
+				goto finish;
+			break;
+		case L'@':
+			trg_existz = true;
+			if (trg.size() == 0)
+				break;
+		default:
+			if (!trg_existz)
+				goto finish;
+			trg += ch;
+			break;
+		}
 	}
+	finish:
 	valid = true;
 }
 
@@ -306,13 +285,41 @@ void serv::handler::sniffer()
 		*this << std::to_wstring(core::cfg.clientz.gval()) + L'|' + core::cfg.name.gval();
 		*this >> buf1;
 
-		*this << std::to_wstring(core::cfg.drop_timeout.gval().tv_sec);
-		*this >> buf1;
-
 		if (buf1 != L"sniffing") {
 			delete this;
 			return;
 		}
+
+		{
+			std::vector<std::wstring> doc;
+			core::cfg.docfd.gval(doc);
+			for (int i = 0; i < doc.size(); i++) {
+				if (doc[i][0] != L'/') {
+					*this << L"|" + doc[i];
+					continue;
+				}
+				std::vector<std::wstring> arg;
+				core::exec.interpreter(doc[i], arg);
+				arg[0].erase(0, 1);
+				if (arg[0] == L"wait") {
+					if (arg.size() != 2)
+						continue;
+					int tmp;
+					try {
+						tmp = std::stoi(arg[1]);
+					} catch (std::invalid_argument) {
+						continue;
+					}
+					if (std::to_wstring(tmp) != arg[1])
+						continue;
+					if (tmp < 0)
+						continue;
+					usleep(1000 * tmp);
+				}
+			}
+		}
+		*this << L"k" + std::to_wstring(core::cfg.drop_timeout.gval().tv_sec);
+
 		core::serv::msg buf2;
 		timeval tmp;
 		gettimeofday(&last, NULL);
@@ -321,6 +328,7 @@ void serv::handler::sniffer()
 		imma_ready();
 		for (;;) {
 			*this >> buf2;
+			usleep(1000);
 			if (buf2.gbody()[0] == L'/') {
 				if (buf2.gbody().size() == 1)
 					continue;
@@ -346,6 +354,10 @@ void serv::handler::sniffer()
 					*this << core::serv::msg(L"hr", L"");
 					*this << core::serv::msg(L"serv", L"    nicc | \\1" + tmp1);
 					*this << core::serv::msg(L"serv", L"last msg | \\1" + core::serv.nexus.glast(tmp1));
+					if (core::serv.nexus.gusrdata(tmp1).iz_k())
+						*this << core::serv::msg(L"serv", L"  locked | \\1TRU");
+					else
+						*this << core::serv::msg(L"serv", L"  locked | \\1FALZ");
 
 					*this << core::serv::msg(L"serv", L"     omg | \\1" + core::serv.nexus.gusrdata(tmp1).omg.gv());
 					if (core::serv.nexus.gusrdata(tmp1).gbypass())
@@ -506,9 +518,11 @@ void serv::handler::operator>>(std::wstring &trg)
 
 void serv::handler::operator>>(core::serv::msg &trg)
 {
+	if (!gready())
+		return;
 	std::wstring buf;
 	*this >> buf;
-	trg = core::serv::msg(buf);
+	trg = core::serv::msg(usr, buf);
 }
 
 serv::nexus::~nexus()

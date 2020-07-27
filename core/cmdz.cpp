@@ -98,11 +98,7 @@ public:
 		core::serv::handler *diz = core::serv.nexus.diz_handler();
 		if (diz->usrdata->omg.go() == 0 && diz->usrdata->omg.gm() == 0 && diz->usrdata->omg.gg() == 0)
 			return 3;
-		if (arg[1][0] == L'/') {
-			*diz << core::serv::msg(L"serv", L"ERR: msg cannot start with \"/\"");
-			return 1;
-		}
-		core::serv.nexus << core::serv::msg(L"serv", arg[1]);
+		core::serv.nexus << core::serv::msg(L"serv", core::exec.escape(arg[1]) + L" \\1~ \\3" + diz->gusr());
 		return 0;
 	}
 } say;

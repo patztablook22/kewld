@@ -3,7 +3,7 @@ std::wstring exec::escape(std::wstring input)
 	std::wstring res;
 	bool par = false;
 	for (int i = 0; i < input.size(); i++) {
-		char ch = input[i];
+		wint_t ch = input[i];
 		switch (ch) {
 		case L'"':
 			res += L"\\\"";
@@ -11,9 +11,13 @@ std::wstring exec::escape(std::wstring input)
 		case L'\\':
 			res += L"\\\\";
 			break;
-		case L' ':
+		case L'/':
+			res += L"\\/";
+			break;
+		case 32:
 			res += L' ';
 			par = true;
+			break;
 		default:
 			res += ch;
 			break;
@@ -41,7 +45,10 @@ size_t exec::interpreter(std::wstring input, std::vector<std::wstring> &trg, siz
 				tmp += L'"';
 				break;
 			case L'\'':
-				tmp+= L'\'';
+				tmp += L'\'';
+				break;
+			case L'/':
+				tmp += L'/';
 				break;
 			default:
 				break;

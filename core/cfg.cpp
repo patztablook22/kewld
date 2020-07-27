@@ -93,7 +93,7 @@ void cfg::usrz_dir::operator<<(std::wstring input)
 }
 
 cfg::port::port()
-:val(31337)
+:val(12204)
 {
 	core::cfg.extract[L"port"] = this;
 }
@@ -472,4 +472,29 @@ void cfg::registered_only::operator<<(std::wstring input)
 		val = false;
 	else
 		throw 0;
+}
+
+cfg::docfd::docfd()
+{
+	core::cfg.extract[L"docfd"] = this;
+}
+
+void cfg::docfd::gval(std::vector<std::wstring> &trg)
+{
+	trg = val;
+}
+
+void cfg::docfd::operator<<(std::wstring input)
+{
+	std::string path(input.begin(), input.end());
+	std::wifstream fd(path);
+	if (!fd.is_open())
+		throw 1;
+
+	std::wstring buf;
+	for (int line = 1; std::getline(fd, buf); line++) {
+		if (buf.size() == 0)
+			buf += 32;
+		val.push_back(buf);
+	}
 }
