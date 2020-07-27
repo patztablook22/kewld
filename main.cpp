@@ -4,7 +4,7 @@
  * "lol imma waste my time" ~ patz, d6022
  */
 
-#define VERSION 89	// editing diz may cause unexpected behaviour
+#define VERSION 90	// editing diz may cause unexpected behaviour
 
 // needed libz:
 #include <iostream>	// IO stream
