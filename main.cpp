@@ -1,10 +1,10 @@
 /*
  * Konverzace Everybody Will Like Like server
- * C++ IRC
+ * C++ IRC with SSL encryption
  * "lol imma waste my time" ~ patz, d6022
  */
 
-#define VERSION 85	// editing diz may cause unexpected behaviour
+#define VERSION 86	// editing diz may cause unexpected behaviour
 
 // needed libz:
 #include <iostream>	// IO stream

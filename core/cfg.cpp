@@ -259,6 +259,8 @@ void cfg::conn_delay::operator<<(std::wstring input)
 	} catch (std::invalid_argument) {
 		throw 0;
 	}
+	if (input != std::to_wstring(tmp))
+		throw 0;
 	if (tmp < 0)
 		throw 1;
 	val = tmp;
@@ -283,6 +285,8 @@ void cfg::passwd_invalid_delay::operator<<(std::wstring input)
 	} catch (std::invalid_argument) {
 		throw 0;
 	}
+	if (input != std::to_wstring(tmp))
+		throw 0;
 	if (tmp < 0)
 		throw 1;
 	val = tmp;
@@ -307,6 +311,8 @@ void cfg::flood_delay::operator<<(std::wstring input)
 	} catch (std::invalid_argument) {
 		throw 0;
 	}
+	if (input != std::to_wstring(tmp))
+		throw 0;
 	if (tmp < 0)
 		throw 1;
 	val = tmp;
