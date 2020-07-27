@@ -95,6 +95,8 @@ void exec::operator<<(std::wstring input)
 {
 	std::vector<std::wstring> arg;
 	core::serv::handler *diz = core::serv.nexus.diz_handler();
+	if (!diz->gready())
+		return;
 	if (core::exec.interpreter(input, arg) != input.size()) {
 		*diz << core::serv::msg(L"serv", L"ERR: interpretation failed");
 		return;

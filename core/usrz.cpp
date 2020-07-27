@@ -11,6 +11,38 @@ void usrz::init()
 	}
 }
 
+uint8_t usrz::registration(std::wstring usr, std::wstring passwd)
+{
+	{
+		std::wifstream test(core::cfg.usrz_dir.gval() + std::string(usr.begin(), usr.end()));
+		if (test.is_open()) {
+			test.close();
+			return 1;
+		}
+	}
+	std::wofstream fd(core::cfg.usrz_dir.gval() + std::string(usr.begin(), usr.end()), std::ofstream::out);
+	if (!fd.is_open())
+		return -1;
+	fd << usr << L' ' << passwd << std::endl;
+	fd << L"---";
+	fd.close();
+	return 0;
+}
+
+uint8_t usrz::chpasswd(std::wstring usr, std::wstring passwd)
+{
+	if (passwd.size() != 64)
+		return 2;
+	std::wfstream fd(core::cfg.usrz_dir.gval() + std::string(usr.begin(), usr.end()), std::ios::in | std::ios::out);
+	if (!fd.is_open())
+		return 1;
+	fd.seekp(std::string(usr.begin(), usr.end()).size() + 1);
+	fd << passwd;
+	fd.close();
+	return 0;
+}
+
+
 usrz::omg::omg()
 :val{0, 0, 0}
 {
@@ -137,4 +169,12 @@ bool usrz::usr::iz_k()
 bool usrz::usr::auth(std::wstring da_passwd)
 {
 	return k && da_passwd == passwd;
+}
+
+void usrz::usr::operator=(usr da_usr)
+{
+	nick = da_usr.nick;
+	passwd = da_usr.passwd;
+	k = da_usr.k;
+	permz = da_usr.permz;
 }

@@ -101,7 +101,7 @@ void serv::msg::operator=(msg da_msg)
 }
 
 serv::handler::handler(SSL *da_ssl)
-:ready(false), permz(L"---"), disconn_t(-1)
+:ready(false), disconn_t(-1)
 {
 	ssl = da_ssl;
 	std::thread sniff_th(&core::serv::handler::sniffer, this);
@@ -176,23 +176,23 @@ void serv::handler::sniffer()
 			delete this;
 			return;
 		}
-		core::usrz::usr usrdata(stg);
-		if (core::cfg.passwd.gon() || usrdata.iz_k()) {
+		usrdata = new core::usrz::usr(stg);
+		if (core::cfg.passwd.gon() || usrdata->iz_k()) {
 			for (int i = 1;; i++) {
-				*this << L"passwd " + std::wstring((usrdata.iz_k() ? L"usr" : L"serv"));
+				*this << L"passwd " + std::wstring((usrdata->iz_k() ? L"usr" : L"serv"));
 				*this >> buf1;
 				buf1.erase(0, 1);
-				if (usrdata.auth(buf1))
+				if (usrdata->auth(buf1))
 					break;
 				if (buf1 == core::cfg.passwd.gval()) {
-					if (usrdata.iz_k()) {
+					if (usrdata->iz_k()) {
 						*this << L"registered";
 						delete this;
 						return;
 					}
 					break;
 				}
-				usleep(1000 * core::cfg.passwd_invalid_delay.gval());
+				usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
 				if (i == core::cfg.attemptz.gval()) {
 					*this << L"attemptz";
 					delete this;
@@ -214,6 +214,10 @@ void serv::handler::sniffer()
 			return;
 		case 2:
 			*this << L"n";
+			delete this;
+			return;
+		case 3:
+			*this << L"r";
 			delete this;
 			return;
 		default:
@@ -260,8 +264,6 @@ void serv::handler::sniffer()
 		timeval tm, tmp;
 		gettimeofday(&tm, NULL);
 		tm.tv_sec -= core::cfg.flood_delay.gval() / 1000 + 1;
-		if (usrdata.permz.iz_k())
-			permz = usrdata.permz;
 		if (core::cfg.hoi_msg.gval().size() != 0)
 			*this << core::serv::msg(L"serv", L'@' + usr + L' ' + core::cfg.hoi_msg.gval());
 		imma_ready();
@@ -279,6 +281,63 @@ void serv::handler::sniffer()
 				} else if (tmp1 == L"disconn") {
 					*this << core::serv::msg(L"serv", L"/disconn d " + core::exec.escape(core::cfg.boi_msg.gval()));
 					disconn_t = 0;
+				} else if (tmp1 == L"register") {
+					if (usrdata->iz_k()) {
+						*this << core::serv::msg(L"serv", L"ERR: ur already registered here");
+						continue;
+					}
+					if (!core::cfg.allow_registration.gval()) {
+						*this << core::serv::msg(L"serv", L"ERR: registration iz not allowed here");
+						continue;
+					}
+					std::wstring buf0, buf1;
+					*this << core::serv::msg(L"serv", L"/usrz register 0");
+					*this >> buf0;
+					*this << core::serv::msg(L"serv", L"/usrz register 1");
+					*this >> buf1;
+					if (buf0 != buf1) {
+						*this << core::serv::msg(L"serv", L"ERR: passwdz dont match");
+						continue;
+					}
+					buf0.erase(0, 1);
+					if (core::usrz.registration(usr, buf0) != 0) {
+						*this << core::serv::msg(L"serv", L"ERR: problem with creating usr file");
+						continue;
+					}
+					usrdata = new core::usrz::usr(usr);
+					core::log << L"registration successful: " + usr;
+					*this << core::serv::msg(L"serv", L"registration successful");
+				} else if (tmp1 == L"chpasswd") {
+					if (!usrdata->iz_k()) {
+						*this << core::serv::msg(L"serv", L"ERR: ur not registered here");
+						continue;
+					}
+					std::wstring buf0, buf1, buf2;
+					*this << core::serv::msg(L"serv", L"/usrz chpasswd 0");
+					*this >> buf0;
+					if (!usrdata->auth(buf0.substr(1, buf0.size() - 1))) {
+						usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
+						*this << core::serv::msg(L"serv", L"ERR: passwd incorrect");
+						continue;
+					}
+					*this << core::serv::msg(L"serv", L"/usrz chpasswd 1");
+					*this >> buf1;
+					*this << core::serv::msg(L"serv", L"/usrz chpasswd 2");
+					*this >> buf2;
+					if (buf1 != buf2) {
+						*this << core::serv::msg(L"serv", L"ERR: passwdz dont match");
+						continue;
+					}
+					if (buf0 == buf1) {
+						*this << core::serv::msg(L"serv", L"WARN: same as current value");
+						continue;
+					}
+					buf1.erase(0, 1);
+					if (core::usrz.chpasswd(usr, buf1) != 0) {
+						*this << core::serv::msg(L"serv", L"ERR: problem with editing usr file");
+						continue;
+					}
+					*this << core::serv::msg(L"serv", L"passwd change successful");
 				} else {
 					*this << core::serv::msg(L"serv", buf2.gbody());
 				}
@@ -388,11 +447,14 @@ void serv::nexus::operator<<(msg da_msg)
 
 int serv::nexus::join(std::wstring &da_usr, handler *da_handler)
 {
-	if (connected.size() == core::cfg.clientz.gval())
+	if (!da_handler->usrdata->iz_k() && core::cfg.registered_only.gval())
+		return 3;
+	bool bypass = da_handler->usrdata->permz.go() == 2 || da_handler->usrdata->permz.gm() == 2 || da_handler->usrdata->permz.gm() == 2;
+	if (connected.size() >= core::cfg.clientz.gval() && !bypass)
 		return 1;
 	if (connected.find(da_usr) != connected.end())
 		return 2;
-	if (connected.size() == core::cfg.clientz.gval())
+	if (connected.size() >= core::cfg.clientz.gval() && !bypass)
 		return 1;
 	connected[da_usr] = da_handler;
 	threadz[da_handler->gtid()] = da_handler;
@@ -459,7 +521,7 @@ core::usrz::omg serv::nexus::client_omg(std::wstring nick)
 {
 	if (connected.find(nick) == connected.end())
 		return core::usrz::omg(L"---");
-	return connected[nick]->permz;
+	return connected[nick]->usrdata->permz;
 }
 
 int serv::serve(int port, int clientz)

@@ -10,7 +10,7 @@ public:
 		if (arg.size() != 1)
 			return 2;
 		core::serv::handler *diz = core::serv.nexus.diz_handler();
-		if (diz->permz.go() < 1)
+		if (diz->usrdata->permz.go() < 1)
 			return 3;
 		raise(SIGTERM);
 		return 0;
@@ -30,7 +30,7 @@ public:
 			return 2;
 		core::serv::handler *diz = core::serv.nexus.diz_handler();
 		std::wstring permz;
-		switch (diz->permz.go()) {
+		switch (diz->usrdata->permz.go()) {
 		default:
 			permz += L'-';
 			break;
@@ -40,7 +40,7 @@ public:
 		case 2:
 			permz += L'O';
 		}
-		switch (diz->permz.gm()) {
+		switch (diz->usrdata->permz.gm()) {
 		default:
 			permz += L'-';
 			break;
@@ -51,7 +51,7 @@ public:
 			permz += L'M';
 			break;
 		}
-		switch (diz->permz.gg()) {
+		switch (diz->usrdata->permz.gg()) {
 		default:
 			permz += L'-';
 			break;
@@ -81,10 +81,10 @@ public:
 		core::serv::handler *diz = core::serv.nexus.diz_handler();
 		if (diz == NULL)
 			return 4;
-		if (!diz->permz.iz_k())
+		if (!diz->usrdata->permz.iz_k())
 			return 3;
 		core::usrz::omg trg = core::serv.nexus.client_omg(arg[1]);
-		switch (diz->permz.gm()) {
+		switch (diz->usrdata->permz.gm()) {
 		case 0:
 			return 3;
 		case 1:

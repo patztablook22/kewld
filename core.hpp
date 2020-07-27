@@ -152,15 +152,15 @@ public:
 		int val;
 	} conn_delay;
 
-	class passwd_invalid_delay: public sub_cfg {
+	class passwd_incorrect_delay: public sub_cfg {
 	public:
-		passwd_invalid_delay();
+		passwd_incorrect_delay();
 		int gval();
 		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
-	} passwd_invalid_delay;
+	} passwd_incorrect_delay;
 
 	class flood_delay: public sub_cfg {
 	public:
@@ -181,6 +181,26 @@ public:
 		void operator<<(std::wstring);
 		std::wstring val;
 	} flood_msg;
+
+	class allow_registration: public sub_cfg {
+	public:
+		allow_registration();
+		bool gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		bool val;
+	} allow_registration;
+
+	class registered_only: public sub_cfg {
+	public:
+		registered_only();
+		bool gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		bool val;
+	} registered_only;
 } cfg;
 
 /*********************************************************************************************/
@@ -200,6 +220,7 @@ private:
 class usrz {
 public:
 	void init();
+	uint8_t registration(std::wstring, std::wstring), chpasswd(std::wstring, std::wstring);
 
 	class omg {
 	public:
@@ -217,6 +238,7 @@ public:
 		bool iz_k();
 		bool auth(std::wstring);
 		core::usrz::omg permz;
+		void operator=(usr);
 	private:
 		std::wstring nick, passwd;
 		bool k;
@@ -249,7 +271,7 @@ public:
 		std::wstring gusr();
 		bool gready();
 		uint8_t gdisconn_t();
-		usrz::omg permz;
+		usrz::usr *usrdata;
 		uint8_t kick();
 	private:
 		void imma_ready();
@@ -263,7 +285,7 @@ public:
 		std::thread::id tid;
 		std::wstring usr;
 		bool ready;
-		uint8_t disconn_t;	
+		uint8_t disconn_t;
 	};
 
 	class nexus {

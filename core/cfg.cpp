@@ -249,7 +249,7 @@ std::wstring cfg::name::gval()
 
 void cfg::name::operator<<(std::wstring input)
 {
-	if (input.size() > 15 || !iz_k(input))
+	if (input.size() < 3 || input.size() > 15 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -267,7 +267,7 @@ std::wstring cfg::hoi_msg::gval()
 
 void cfg::hoi_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 238 || !iz_k(input))
+	if (input.size() < 3 || input.size() > 238 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -285,7 +285,7 @@ std::wstring cfg::boi_msg::gval()
 
 void cfg::boi_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 238 || !iz_k(input))
+	if (input.size() < 3 || input.size() > 238 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -303,7 +303,7 @@ std::wstring cfg::ded_msg::gval()
 
 void cfg::ded_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 238 || !iz_k(input))
+	if (input.size() < 3 || input.size() > 238 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -334,18 +334,18 @@ void cfg::conn_delay::operator<<(std::wstring input)
 	val = tmp;
 }
 
-cfg::passwd_invalid_delay::passwd_invalid_delay()
+cfg::passwd_incorrect_delay::passwd_incorrect_delay()
 :val(500)
 {
-	core::cfg.extract[L"passwd_invalid_delay"] = this;
+	core::cfg.extract[L"passwd_incorrect_delay"] = this;
 }
 
-int cfg::passwd_invalid_delay::gval()
+int cfg::passwd_incorrect_delay::gval()
 {
 	return val;
 }
 
-void cfg::passwd_invalid_delay::operator<<(std::wstring input)
+void cfg::passwd_incorrect_delay::operator<<(std::wstring input)
 {
 	int tmp;
 	try {
@@ -361,7 +361,7 @@ void cfg::passwd_invalid_delay::operator<<(std::wstring input)
 }
 
 cfg::flood_delay::flood_delay()
-:val(50)
+:val(500)
 {
 	core::cfg.extract[L"flood_delay"] = this;
 }
@@ -399,7 +399,49 @@ std::wstring cfg::flood_msg::gval()
 
 void cfg::flood_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 255 || !iz_k(input))
+	if (input.size() < 3 || input.size() > 255 || !iz_k(input))
 		throw 1;
 	val = input;
+}
+
+cfg::allow_registration::allow_registration()
+:val(true)
+{
+	core::cfg.extract[L"allow_registration"] = this;
+}
+
+bool cfg::allow_registration::gval()
+{
+	return val;
+}
+
+void cfg::allow_registration::operator<<(std::wstring input)
+{
+	if (input == L"TRU")
+		val = true;
+	else if (input == L"FALZ")
+		val = false;
+	else
+		throw 0;
+}
+
+cfg::registered_only::registered_only()
+:val(false)
+{
+	core::cfg.extract[L"registered_only"] = this;
+}
+
+bool cfg::registered_only::gval()
+{
+	return val;
+}
+
+void cfg::registered_only::operator<<(std::wstring input)
+{
+	if (input == L"TRU")
+		val = true;
+	else if (input == L"FALZ")
+		val = false;
+	else
+		throw 0;
 }
