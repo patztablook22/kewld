@@ -41,29 +41,60 @@ serv::msg::msg(std::wstring input)
 :valid(false)
 {
 	int pos = input.find(32);
-	if (pos == std::wstring::npos || pos == 0 || pos == input.size() - 1)
+	if (pos == std::wstring::npos || pos == 0 || pos == input.size() - 1 || !core::iz_k(input))
 		return;
-	usr = core::trim(input.substr(0, pos));
-	body = core::trim(input.substr(pos + 1, input.size() - pos - 1));
-	if (usr.size() < 3 || usr.size() > 15 || body.size() == 0 || body.size() > 255 || !core::iz_k(usr) || !core::iz_k(body))
+	usr = input.substr(0, pos);
+	std::wstring tmp = input.substr(pos + 1, input.size() - pos - 1);
+	wint_t last = 32;
+	for (int i = 0; i < tmp.size(); i++) {
+		wint_t ch = tmp[i];
+		switch (ch) {
+		case L'\\':
+			i++;
+			switch (tmp[i]) {
+			case L'\\':
+				body += L"\\\\";
+				last = L'\\';
+				break;
+			case L'"':
+				body += L"\\\"";
+				last = L'"';
+				break;
+			}
+			break;
+		case 32:
+			if (last == 32)
+				break;
+		default:
+			body += ch;
+			last = ch;
+			break;
+		}
+	}
+	if (body.size() == 0 || body.size() > 255)
 		return;
-	if (body[0] == '@') {
+	if (body[0] == L'@') {
 		pos = body.find(32);
-		if (pos == std::wstring::npos)
+		if (pos == -1)
 			pos = body.size();
 		trg = body.substr(1, pos - 1);
 	}
-
 	valid = true;
 }
 
 serv::msg::msg(std::wstring da_usr, std::wstring da_body)
 :valid(false)
 {
-	if (da_usr.size() < 3 || da_usr.size() > 15 || da_body.size() == 0 || da_body.size() > 255 || !core::iz_k(da_usr) || !core::iz_k(da_body))
+	if ((da_usr.size() < 3 || da_usr.size() > 15 || da_body.size() == 0 || da_body.size() > 255 || !core::iz_k(da_usr) || !core::iz_k(da_body)) && !(da_usr == L"hr" && da_body.size() == 0))
 		return;
 	usr = da_usr;
 	body = da_body;
+	if (body[0] == '@') {
+		int pos = body.find(32);
+		if (pos == std::wstring::npos)
+			pos = body.size();
+		trg = body.substr(1, pos - 1);
+	}
 	valid = true;
 }
 
@@ -141,9 +172,16 @@ uint8_t serv::handler::kick()
 	return 0;
 }
 
+timeval serv::handler::glast()
+{
+	return last;
+}
+
 void serv::handler::imma_ready()
 {
 	ready = true;
+	if (core::cfg.hoi_msg.gval().size() != 0)
+		*this << core::serv::msg(L"serv", L'@' + usr + L' ' + core::cfg.hoi_msg.gval());
 	core::serv.nexus << core::serv::msg(L"serv", L"/usrz conn " + usr);
 	core::log << usr + L" connected";
 }
@@ -192,12 +230,24 @@ void serv::handler::sniffer()
 					}
 					break;
 				}
-				usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
+				if (!usrdata->iz_k())
+					usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
 				if (i == core::cfg.attemptz.gval()) {
 					*this << L"attemptz";
 					delete this;
 					return;
 				}
+			}
+		}
+		{
+			timeval timeout = core::cfg.drop_timeout.gval();
+			if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+				delete this;
+				return;
+			}
+			if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0) {
+				delete this;
+				return;
 			}
 		}
 		*this << L"succeed";
@@ -206,7 +256,7 @@ void serv::handler::sniffer()
 		switch (core::serv.nexus.join(stg, this)) {
 		case 0:
 			usr = stg;
-			*this << L"k" + usrdata->permz.gv() + usr;
+			*this << L"k" + usrdata->omg.gv() + usr;
 			break;
 		case 1:
 			*this << L"f";
@@ -256,20 +306,24 @@ void serv::handler::sniffer()
 		*this << std::to_wstring(core::cfg.clientz.gval()) + L'|' + core::cfg.name.gval();
 		*this >> buf1;
 
+		*this << std::to_wstring(core::cfg.drop_timeout.gval().tv_sec);
+		*this >> buf1;
+
 		if (buf1 != L"sniffing") {
 			delete this;
 			return;
 		}
 		core::serv::msg buf2;
-		timeval tm, tmp;
-		gettimeofday(&tm, NULL);
-		tm.tv_sec -= core::cfg.flood_delay.gval() / 1000 + 1;
-		if (core::cfg.hoi_msg.gval().size() != 0)
-			*this << core::serv::msg(L"serv", L'@' + usr + L' ' + core::cfg.hoi_msg.gval());
+		timeval tmp;
+		gettimeofday(&last, NULL);
+		last.tv_sec -= core::cfg.flood_delay.gval() / 1000 + 1;
+
 		imma_ready();
 		for (;;) {
 			*this >> buf2;
 			if (buf2.gbody()[0] == L'/') {
+				if (buf2.gbody().size() == 1)
+					continue;
 				int pos = buf2.gbody().find(32);
 				if (pos == std::wstring::npos)
 					pos = buf2.gbody().size();
@@ -281,6 +335,24 @@ void serv::handler::sniffer()
 				} else if (tmp1 == L"disconn") {
 					*this << core::serv::msg(L"serv", L"/disconn d " + core::exec.escape(core::cfg.boi_msg.gval()));
 					disconn_t = 0;
+				} else if (tmp1 == L"whoiz") {
+					if (buf2.gbody().size() < 12 || buf2.gbody().size() > 24)
+						continue;
+					tmp1 = buf2.gbody().substr(8, buf2.gbody().size() - 9);
+					if (!core::serv.nexus.gready(tmp1)) {
+						*this << core::serv::msg(L"serv", L"ERR: no such usr: \"" + tmp1 + L'"');
+						continue;
+					}
+					*this << core::serv::msg(L"hr", L"");
+					*this << core::serv::msg(L"serv", L"    nicc | \\1" + tmp1);
+					*this << core::serv::msg(L"serv", L"last msg | \\1" + core::serv.nexus.glast(tmp1));
+
+					*this << core::serv::msg(L"serv", L"     omg | \\1" + core::serv.nexus.gusrdata(tmp1).omg.gv());
+					if (core::serv.nexus.gusrdata(tmp1).gbypass())
+						*this << core::serv::msg(L"serv", L"  bypass | \\1TRU");
+					else
+						*this << core::serv::msg(L"serv", L"  bypass | \\1FALZ");
+					*this << core::serv::msg(L"hr", L"");
 				} else if (tmp1 == L"register") {
 					if (usrdata->iz_k()) {
 						*this << core::serv::msg(L"serv", L"ERR: ur already registered here");
@@ -307,6 +379,9 @@ void serv::handler::sniffer()
 					usrdata = new core::usrz::usr(usr);
 					core::log << L"registration successful: " + usr;
 					*this << core::serv::msg(L"serv", L"registration successful");
+				} else if (tmp1 == L"omg_f5") {
+					core::usrz::usr tmpud(usr);
+					usrdata->omg = tmpud.omg;
 				} else if (tmp1 == L"chpasswd") {
 					if (!usrdata->iz_k()) {
 						*this << core::serv::msg(L"serv", L"ERR: ur not registered here");
@@ -316,7 +391,6 @@ void serv::handler::sniffer()
 					*this << core::serv::msg(L"serv", L"/usrz chpasswd 0");
 					*this >> buf0;
 					if (!usrdata->auth(buf0.substr(1, buf0.size() - 1))) {
-						usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
 						*this << core::serv::msg(L"serv", L"ERR: passwd incorrect");
 						continue;
 					}
@@ -343,13 +417,13 @@ void serv::handler::sniffer()
 				}
 			} else {
 				gettimeofday(&tmp, NULL);
-				int s = tmp.tv_sec - tm.tv_sec;
+				int s = tmp.tv_sec - last.tv_sec;
 				bool elapsed;
 				if (s < core::cfg.flood_delay.gval() / 1000)
 					elapsed = false;
 				else if (s > core::cfg.flood_delay.gval() / 1000 + 1)
 					elapsed = true;
-				else if (1000 * s + (tmp.tv_usec - tm.tv_usec) / 1000 >= core::cfg.flood_delay.gval())
+				else if (1000 * s + (tmp.tv_usec - last.tv_usec) / 1000 >= core::cfg.flood_delay.gval())
 					elapsed = true;
 				else
 					elapsed = false;
@@ -358,7 +432,7 @@ void serv::handler::sniffer()
 					core::serv.nexus << buf2;
 				else
 					*this << core::serv::msg(L"serv", core::cfg.flood_msg.gval());
-				tm = tmp;
+				last = tmp;
 			}
 		}
 		
@@ -411,14 +485,23 @@ void serv::handler::operator>>(int &trg)
 
 void serv::handler::operator>>(std::wstring &trg)
 {
+	trg.clear();
 	if (ssl == NULL)
 		throw 1;
-	wchar_t buf[1024];
-	int bytez = SSL_read(ssl, &buf, sizeof(buf));
-	if (bytez <= 0)
-		throw 1;
-	buf[bytez / 4] = 0;
-	trg = buf;
+	std::wstring tmp;
+	int bytez;
+	do {
+		wchar_t buf[1024];
+		bytez = SSL_read(ssl, &buf, sizeof(buf));
+		if (bytez <= 0) {
+			if (errno == EAGAIN)
+				disconn_t = 2;
+			throw 1;
+		}
+		buf[bytez / 4] = 0;
+		tmp = buf;
+	} while (tmp == L"/" && gready());
+	trg = tmp;
 }
 
 void serv::handler::operator>>(core::serv::msg &trg)
@@ -444,28 +527,39 @@ void serv::nexus::operator<<(msg da_msg)
 			if (key.second->gready())
 				*key.second << da_msg;
 	} else {
+		if (da_msg.gtrg().size() > 15 || da_msg.gtrg().size() < 3) {
+			if (da_msg.gusr() != L"serv")
+				*connected[da_msg.gusr()] << core::serv::msg(L"serv", L"ERR: nicc size must be between 3 and 15 charz");
+			return;
+		}
 		if (connected.find(da_msg.gtrg()) != connected.end()) {
 			if (connected[da_msg.gtrg()]->gready())
 				*connected[da_msg.gtrg()] << da_msg;
-			if (da_msg.gusr() != da_msg.gtrg())
+			if (da_msg.gusr() != da_msg.gtrg() && da_msg.gusr() != L"serv")
 				*connected[da_msg.gusr()] << da_msg;
-		} else {
+		} else if (da_msg.gusr() != L"serv") {
 			*connected[da_msg.gusr()] << core::serv::msg(L"serv", L"ERR: \"" + da_msg.gtrg() + L"\" iz not online");
 		}
 
 	}
 }
 
+bool serv::nexus::gready(std::wstring nicc)
+{
+	if (connected.find(nicc) != connected.end() && connected[nicc]->gready())
+		return true;
+	return false;
+}
+
 int serv::nexus::join(std::wstring &da_usr, handler *da_handler)
 {
 	if (!da_handler->usrdata->iz_k() && core::cfg.registered_only.gval())
 		return 3;
-	bool bypass = da_handler->usrdata->permz.go() == 2 || da_handler->usrdata->permz.gm() == 2 || da_handler->usrdata->permz.gm() == 2;
-	if (connected.size() >= core::cfg.clientz.gval() && !bypass)
+	if (connected.size() >= core::cfg.clientz.gval() && !da_handler->usrdata->gbypass())
 		return 1;
 	if (connected.find(da_usr) != connected.end())
 		return 2;
-	if (connected.size() >= core::cfg.clientz.gval() && !bypass)
+	if (connected.size() >= core::cfg.clientz.gval() && !da_handler->usrdata->gbypass())
 		return 1;
 	connected[da_usr] = da_handler;
 	threadz[da_handler->gtid()] = da_handler;
@@ -493,6 +587,10 @@ int serv::nexus::leave(handler *da_handler)
 		case 1:
 			*this << core::serv::msg(L"serv", L"/usrz kick " + da_handler->gusr());
 			core::log << da_handler->gusr() + L" kicked out";
+			break;
+		case 2:
+			*this << core::serv::msg(L"serv", L"/usrz timeo " + da_handler->gusr());
+			core::log << da_handler->gusr() + L" timed out";
 			break;
 		}
 	}
@@ -528,11 +626,34 @@ serv::handler *serv::nexus::diz_handler()
 	return threadz[std::this_thread::get_id()];
 }
 
-core::usrz::omg serv::nexus::client_omg(std::wstring nick)
+core::usrz::usr serv::nexus::gusrdata(std::wstring nicc)
 {
-	if (connected.find(nick) == connected.end())
-		return core::usrz::omg(L"---");
-	return connected[nick]->usrdata->permz;
+	if (!gready(nicc))
+		return core::usrz::usr(L"");
+	return *connected[nicc]->usrdata;
+}
+
+std::wstring serv::nexus::glast(std::wstring nicc)
+{
+	if (!gready(nicc))
+		return L"";
+	timeval last = connected[nicc]->glast(), tmp;
+	gettimeofday(&tmp, NULL);
+	unsigned long long int diff = tmp.tv_sec - last.tv_sec;
+	if (diff <= 1)
+		return L"now";
+	std::wstring res(std::to_wstring(diff % 60) + L's');
+	diff /= 60;
+	if (diff == 0)
+		goto da_return;
+	res.insert(0, std::to_wstring(diff % 60) + L"m ");
+	diff /= 60;
+	if (diff == 0)
+		goto da_return;
+	res.insert(0, std::to_wstring(diff) + L"h ");
+	da_return:
+	res.insert(0, L"now - ");
+	return res;	
 }
 
 int serv::serve(int port, int clientz)
@@ -542,8 +663,14 @@ int serv::serve(int port, int clientz)
 		bacclog++;
 	struct sockaddr_in addr;
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
-	setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &tmp, sizeof(tmp));
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp)) < 0) {
+		core::log << L"ERR: setsockopt failed";
+		exit(EXIT_FAILURE);
+	}
+	if (setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &tmp, sizeof(tmp)) < 0) {
+		core::log << L"ERR: setsockopt failed";
+		exit(EXIT_FAILURE);
+	}
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
@@ -551,12 +678,12 @@ int serv::serve(int port, int clientz)
 
 	if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
 		core::log << L"ERR: bind failed";
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (listen(sockfd, bacclog) != 0) {
 		core::log << L"ERR: listen failed";
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	core::log << L"serving on port " + std::to_wstring(port);
@@ -583,15 +710,15 @@ void serv::load_certificatez(const char *certfd, const char *keyfd)
 {
 	if (SSL_CTX_use_certificate_file(ctx, certfd, SSL_FILETYPE_PEM) <= 0) {
 		core::log << L"ERR: unable to read SSL cert file";
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (SSL_CTX_use_PrivateKey_file(ctx, keyfd, SSL_FILETYPE_PEM) <= 0) {
 		core::log << L"ERR: unable to read SSL key file";
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (!SSL_CTX_check_private_key(ctx)) {
 		core::log << L"ERR: private key doesnt match the public certificate";
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 }
 

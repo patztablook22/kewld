@@ -24,7 +24,7 @@ uint8_t usrz::registration(std::wstring usr, std::wstring passwd)
 	if (!fd.is_open())
 		return -1;
 	fd << usr << L' ' << passwd << std::endl;
-	fd << L"---";
+	fd << L"--- FALZ";
 	fd.close();
 	return 0;
 }
@@ -40,6 +40,55 @@ uint8_t usrz::chpasswd(std::wstring usr, std::wstring passwd)
 	fd << passwd;
 	fd.close();
 	return 0;
+}
+
+uint8_t usrz::chomg(std::wstring usr, wchar_t perm, uint8_t val)
+{
+	size_t jmp;
+	switch (perm) {
+	case L'o':
+		jmp = 0;
+		break;
+	case L'm':
+		jmp = 1;
+		break;
+	case L'g':
+		jmp = 2;
+		break;
+	default:
+		return 2;
+	}
+	jmp += std::string(usr.begin(), usr.end()).size() + 66;
+	if (val < 0 || val > 2)
+		return 3;
+	wchar_t da_val = L'-';
+	if (val == 1) {
+		da_val = perm;
+	} else if (val == 2) {
+		switch (perm) {
+		case L'o':
+			da_val = L'O';
+			break;
+		case L'm':
+			da_val = L'M';
+			break;
+		case L'g':
+			da_val = L'G';
+			break;
+		}
+	}
+	std::wfstream fd(core::cfg.usrz_dir.gval() + std::string(usr.begin(), usr.end()), std::ios::in | std::ios::out);
+	if (!fd.is_open())
+		return 1;
+	fd.seekp(jmp);
+	wchar_t current;
+	fd >> current;
+	if (current == da_val)
+		return -1;
+	fd.seekp(jmp);
+	fd << da_val;
+	fd.close();
+	return 0;	
 }
 
 
@@ -166,7 +215,7 @@ void usrz::omg::operator=(usrz::omg permz)
 }
 
 usrz::usr::usr(std::wstring da_usr)
-:k(false)
+:bypass(false), k(false)
 {
 	std::string tmp(da_usr.begin(), da_usr.end());
 	std::wifstream fd(core::cfg.usrz_dir.gval() + tmp);
@@ -186,8 +235,17 @@ usrz::usr::usr(std::wstring da_usr)
 			passwd = buf.substr(tmp1 + 1, buf.size() - tmp1 - 1);
 			break;
 		case 2:
-			permz = core::usrz::omg(buf);
-			if (!permz.iz_k())
+			if (buf.size() < 7 || buf[3] != 32)
+				return;
+			omg = core::usrz::omg(buf.substr(0, 3));
+			if (!omg.iz_k())
+				return;
+			buf.erase(0, 4);
+			if (buf == L"TRU")
+				bypass = true;
+			else if (buf == L"FALZ")
+				bypass = false;
+			else
 				return;
 			break;
 		default:
@@ -206,7 +264,15 @@ bool usrz::usr::iz_k()
 
 bool usrz::usr::auth(std::wstring da_passwd)
 {
-	return k && da_passwd == passwd;
+	if (k && da_passwd == passwd)
+		return true;
+	usleep(1000 * core::cfg.passwd_incorrect_delay.gval());
+	return false;
+}
+
+bool usrz::usr::gbypass()
+{
+	return bypass;
 }
 
 void usrz::usr::operator=(usr da_usr)
@@ -214,5 +280,5 @@ void usrz::usr::operator=(usr da_usr)
 	nick = da_usr.nick;
 	passwd = da_usr.passwd;
 	k = da_usr.k;
-	permz = da_usr.permz;
+	omg = da_usr.omg;
 }

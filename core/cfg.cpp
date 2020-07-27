@@ -118,6 +118,34 @@ void cfg::port::operator<<(std::wstring input)
 	val = tmp;
 }
 
+cfg::drop_timeout::drop_timeout()
+{
+	val.tv_sec = 10;
+	val.tv_usec = 0;
+	core::cfg.extract[L"drop_timeout"] = this;
+}
+
+timeval cfg::drop_timeout::gval()
+{
+	return val;
+}
+
+void cfg::drop_timeout::operator<<(std::wstring input)
+{
+	int tmp;
+	try {
+		tmp = std::stoi(input);
+	} catch (std::invalid_argument) {
+		throw 0;
+	}
+
+	if (input != std::to_wstring(tmp))
+		throw 0;
+	if (tmp <= 0)
+		throw 1;
+	val.tv_sec = tmp;
+}
+
 cfg::clientz::clientz()
 :val(8)
 {

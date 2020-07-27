@@ -50,6 +50,16 @@ public:
 		int val;
 	} port;
 
+	class drop_timeout : public sub_cfg {
+	public:
+		drop_timeout();
+		timeval gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		timeval val;
+	} drop_timeout;
+
 	class clientz: public sub_cfg {
 	public:
 		clientz();
@@ -221,6 +231,7 @@ class usrz {
 public:
 	void init();
 	uint8_t registration(std::wstring, std::wstring), chpasswd(std::wstring, std::wstring);
+	uint8_t chomg(std::wstring, wchar_t, uint8_t);
 
 	class omg {
 	public:
@@ -238,11 +249,12 @@ public:
 		usr(std::wstring);
 		bool iz_k();
 		bool auth(std::wstring);
-		core::usrz::omg permz;
+		core::usrz::omg omg;
+		bool gbypass();
 		void operator=(usr);
 	private:
 		std::wstring nick, passwd;
-		bool k;
+		bool bypass, k;
 	};
 } usrz;
 
@@ -274,6 +286,7 @@ public:
 		uint8_t gdisconn_t();
 		usrz::usr *usrdata;
 		uint8_t kick();
+		timeval glast();
 	private:
 		void imma_ready();
 		void operator<<(std::wstring);
@@ -287,19 +300,22 @@ public:
 		std::wstring usr;
 		bool ready;
 		uint8_t disconn_t;
+		timeval last;
 	};
 
 	class nexus {
 	public:
 		~nexus();
 		void operator<<(msg);
+		bool gready(std::wstring);
 		int join(std::wstring &, handler *);
 		int leave(handler *);
 		int kick(std::wstring);
 		int connno();
 		int connno(std::vector<std::wstring> &);
 		handler *diz_handler();
-		core::usrz::omg client_omg(std::wstring);
+		core::usrz::usr gusrdata(std::wstring);
+		std::wstring glast(std::wstring);
 	private:
 		std::map<std::wstring, handler *> connected;
 		std::map<std::thread::id, handler *> threadz;
