@@ -11,6 +11,90 @@ void usrz::init()
 	}
 }
 
+usrz::omg::omg()
+:val{0, 0, 0}
+{
+}
+
+usrz::omg::omg(std::wstring da_val)
+:val{255, 255, 255}
+{
+	uint8_t tmp_val[3];
+	if (da_val.size() != 3)
+		return;
+	switch (da_val[0]) {
+	case L'-':
+		tmp_val[0] = 0;
+		break;
+	case L'o':
+		tmp_val[0] = 1;
+		break;
+	case L'O':
+		tmp_val[0] = 2;
+		break;
+	default:
+		return;
+	}
+
+	switch (da_val[1]) {
+	case L'-':
+		tmp_val[1] = 0;
+		break;
+	case L'm':
+		tmp_val[1] = 1;
+		break;
+	case L'M':
+		tmp_val[1] = 2;
+		break;
+	default:
+		return;
+	}
+
+	switch (da_val[2]) {
+	case L'-':
+		tmp_val[2] = 0;
+		break;
+	case L'g':
+		tmp_val[2] = 1;
+		break;
+	case L'G':
+		tmp_val[2] = 2;
+		break;
+	default:
+		return;
+	}
+
+	for (int i = 0; i < 3; i++)
+		val[i] = tmp_val[i];
+}
+
+bool usrz::omg::iz_k()
+{
+	return val[0] == 255 ? false : true;
+}
+
+uint8_t usrz::omg::go()
+{
+	return val[0];
+}
+
+uint8_t usrz::omg::gm()
+{
+	return val[1];
+}
+
+uint8_t usrz::omg::gg()
+{
+	return val[2];
+}
+
+void usrz::omg::operator=(usrz::omg permz)
+{
+	val[0] = permz.go();
+	val[1] = permz.gm();
+	val[2] = permz.gg();
+}
+
 usrz::usr::usr(std::wstring da_usr)
 :k(false)
 {
@@ -27,12 +111,21 @@ usrz::usr::usr(std::wstring da_usr)
 			if (tmp1 == std::wstring::npos || tmp1 == 0 || tmp1 == buf.size() - 1)
 				return;
 			nick = buf.substr(0, tmp1);
+			if (nick != da_usr)
+				return;
 			passwd = buf.substr(tmp1 + 1, buf.size() - tmp1 - 1);
+			break;
+		case 2:
+			permz = core::usrz::omg(buf);
+			if (!permz.iz_k())
+				return;
 			break;
 		default:
 			return;
 		}
 	}
+	if (line != 3)
+		return;
 	k = true;
 }
 

@@ -72,6 +72,11 @@ std::wstring serv::msg::gusr()
 	return usr;
 }
 
+std::thread::id serv::handler::gtid()
+{
+	return tid;
+}
+
 std::wstring serv::msg::gbody()
 {
 	return body;
@@ -96,7 +101,7 @@ void serv::msg::operator=(msg da_msg)
 }
 
 serv::handler::handler(SSL *da_ssl)
-:ready(false)
+:ready(false), permz(L"---"), disconn_t(-1)
 {
 	ssl = da_ssl;
 	std::thread sniff_th(&core::serv::handler::sniffer, this);
@@ -105,11 +110,11 @@ serv::handler::handler(SSL *da_ssl)
 
 serv::handler::~handler()
 {
-	if (core::serv.nexus.leave(this) == 0 && ready) {
-		core::serv.nexus << core::serv::msg(L"serv", L"/usrz disconn " + usr);
-		core::log << usr + L" disconnected";
-	}
+	core::serv.nexus.leave(this);
+	if (ssl == NULL)
+		return;
 	int sockfd = SSL_get_fd(ssl);
+	SSL_shutdown(ssl);
 	SSL_free(ssl);
 	close(sockfd);
 }
@@ -117,6 +122,23 @@ serv::handler::~handler()
 bool serv::handler::gready()
 {
 	return ready;
+}
+uint8_t serv::handler::gdisconn_t()
+{
+	return disconn_t;
+}
+
+uint8_t serv::handler::kick()
+{
+	if (!ready)
+		return 1;
+	disconn_t = 1;
+	*this << core::serv::msg(L"serv", L"/disconn k");
+	core::serv.nexus.leave(this);
+	int sockfd = SSL_get_fd(ssl);
+	SSL_shutdown(ssl);
+	close(sockfd);
+	return 0;
 }
 
 void serv::handler::imma_ready()
@@ -129,6 +151,7 @@ void serv::handler::imma_ready()
 
 void serv::handler::sniffer()
 {
+	tid = std::this_thread::get_id();
 	try {
 		int sockfd = SSL_get_fd(ssl);
 		if (SSL_accept(ssl) == -1 ) {
@@ -229,12 +252,6 @@ void serv::handler::sniffer()
 		*this << std::to_wstring(core::cfg.clientz.gval()) + L'|' + core::cfg.name.gval();
 		*this >> buf1;
 
-		*this << L'|' + core::cfg.hoi_msg.gval();
-		*this >> buf1;
-		*this << L'|' + core::cfg.boi_msg.gval();
-
-		*this >> buf1;
-
 		if (buf1 != L"sniffing") {
 			delete this;
 			return;
@@ -243,11 +260,28 @@ void serv::handler::sniffer()
 		timeval tm, tmp;
 		gettimeofday(&tm, NULL);
 		tm.tv_sec -= core::cfg.flood_delay.gval() / 1000 + 1;
+		if (usrdata.permz.iz_k())
+			permz = usrdata.permz;
+		if (core::cfg.hoi_msg.gval().size() != 0)
+			*this << core::serv::msg(L"serv", L'@' + usr + L' ' + core::cfg.hoi_msg.gval());
 		imma_ready();
 		for (;;) {
 			*this >> buf2;
 			if (buf2.gbody()[0] == L'/') {
-				*this << core::serv::msg(L"serv", buf2.gbody());
+				int pos = buf2.gbody().find(32);
+				if (pos == std::wstring::npos)
+					pos = buf2.gbody().size();
+				std::wstring tmp1 = buf2.gbody().substr(1, pos - 1);
+				if (tmp1 == L"servctl") {
+					if (buf2.gbody().size() <= 9)
+						continue;
+					core::exec <<  buf2.gbody().substr(9, buf2.gbody().size() - 9);
+				} else if (tmp1 == L"disconn") {
+					*this << core::serv::msg(L"serv", L"/disconn d " + core::exec.escape(core::cfg.boi_msg.gval()));
+					disconn_t = 0;
+				} else {
+					*this << core::serv::msg(L"serv", buf2.gbody());
+				}
 			} else {
 				gettimeofday(&tmp, NULL);
 				if (1000000 * (tmp.tv_sec - tm.tv_sec) + tmp.tv_usec - tm.tv_usec >= 1000 * core::cfg.flood_delay.gval())
@@ -320,14 +354,13 @@ void serv::handler::operator>>(std::wstring &trg)
 void serv::handler::operator>>(core::serv::msg &trg)
 {
 	std::wstring buf;
-
 	*this >> buf;
 	trg = core::serv::msg(buf);
 }
 
 serv::nexus::~nexus()
 {
-	*this << core::serv::msg(L"serv", L"/disconn");
+	*this << core::serv::msg(L"serv", L"/disconn s " + core::exec.escape(core::cfg.ded_msg.gval()));
 }
 
 void serv::nexus::operator<<(msg da_msg)
@@ -362,6 +395,7 @@ int serv::nexus::join(std::wstring &da_usr, handler *da_handler)
 	if (connected.size() == core::cfg.clientz.gval())
 		return 1;
 	connected[da_usr] = da_handler;
+	threadz[da_handler->gtid()] = da_handler;
 	return 0;
 }
 
@@ -369,7 +403,35 @@ int serv::nexus::leave(handler *da_handler)
 {
 	if (connected.find(da_handler->gusr()) == connected.end())
 		return 1;
+	if (threadz.find(da_handler->gtid()) != threadz.end())
+		threadz.erase(da_handler->gtid());
 	connected.erase(da_handler->gusr());
+	if (da_handler->gready()) {
+		switch (da_handler->gdisconn_t()) {
+		default:
+		case 255:
+			*this << core::serv::msg(L"serv", L"/usrz lost " + da_handler->gusr());
+			core::log << L"connection with " + da_handler->gusr() + L" lost";
+			break;
+		case 0:
+			*this << core::serv::msg(L"serv", L"/usrz disconn " + da_handler->gusr());
+			core::log << da_handler->gusr() + L" disconnected";
+			break;
+		case 1:
+			*this << core::serv::msg(L"serv", L"/usrz kick " + da_handler->gusr());
+			core::log << da_handler->gusr() + L" kicked out";
+			break;
+		}
+	}
+	return 0;
+}
+
+int serv::nexus::kick(std::wstring nick)
+{
+	if (connected.find(nick) == connected.end())
+		return 1;
+	if (connected[nick]->kick() != 0)
+		return 2;
 	return 0;
 }
 
@@ -384,6 +446,20 @@ int serv::nexus::connno(std::vector<std::wstring> &trg)
 	for (const std::pair<std::wstring, handler *> key: connected)
 		trg.push_back(key.first);
 	return connected.size();
+}
+
+serv::handler *serv::nexus::diz_handler()
+{
+	if (threadz.find(std::this_thread::get_id()) == threadz.end())
+		return NULL;
+	return threadz[std::this_thread::get_id()];
+}
+
+core::usrz::omg serv::nexus::client_omg(std::wstring nick)
+{
+	if (connected.find(nick) == connected.end())
+		return core::usrz::omg(L"---");
+	return connected[nick]->permz;
 }
 
 int serv::serve(int port, int clientz)

@@ -29,6 +29,8 @@ void cfg::init()
 		}
 
 		try {
+			if (val.size() == 0)
+				throw 1;
 			*(extract[key]) << val;
 		} catch (int err) {
 			std::wstring tmp(L"ERR: cfg file ");

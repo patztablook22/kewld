@@ -200,11 +200,23 @@ private:
 class usrz {
 public:
 	void init();
+
+	class omg {
+	public:
+		omg(), omg(std::wstring);
+		bool iz_k();
+		uint8_t go(), gm(), gg();
+		void operator=(omg);
+	private:
+		uint8_t val[3];
+	};
+
 	class usr {
 	public:
 		usr(std::wstring);
 		bool iz_k();
 		bool auth(std::wstring);
+		core::usrz::omg permz;
 	private:
 		std::wstring nick, passwd;
 		bool k;
@@ -233,8 +245,12 @@ public:
 	public:
 		handler(SSL *), ~handler();
 		void operator<<(msg);
+		std::thread::id gtid();
 		std::wstring gusr();
 		bool gready();
+		uint8_t gdisconn_t();
+		usrz::omg permz;
+		uint8_t kick();
 	private:
 		void imma_ready();
 		void operator<<(std::wstring);
@@ -244,8 +260,10 @@ public:
 		void operator>>(msg &);
 		void sniffer();
 		SSL *ssl;
+		std::thread::id tid;
 		std::wstring usr;
 		bool ready;
+		uint8_t disconn_t;	
 	};
 
 	class nexus {
@@ -254,10 +272,14 @@ public:
 		void operator<<(msg);
 		int join(std::wstring &, handler *);
 		int leave(handler *);
+		int kick(std::wstring);
 		int connno();
 		int connno(std::vector<std::wstring> &);
+		handler *diz_handler();
+		core::usrz::omg client_omg(std::wstring);
 	private:
 		std::map<std::wstring, handler *> connected;
+		std::map<std::thread::id, handler *> threadz;
 	} nexus;
 private:
 	int serve(int, int);
@@ -269,9 +291,34 @@ private:
 
 /*********************************************************************************************/
 
+class exec {
+public:
+	std::wstring escape(std::wstring);
+	size_t interpreter(std::wstring, std::vector<std::wstring> &, size_t = -1);
+
+	class cmd {
+	public:
+		virtual uint8_t do_it(std::vector<std::wstring>) = 0;
+	};
+
+	void operator<<(std::wstring);
+
+	void add(std::wstring, cmd *);
+private:
+	std::map<std::wstring, cmd *> cmdz;
+} exec;
+
+/*********************************************************************************************/
+
 #include "core/toolz.cpp"
 #include "core/cfg.cpp"
 #include "core/log.cpp"
 #include "core/usrz.cpp"
 #include "core/serv.cpp"
+#include "core/exec.cpp"
+
+namespace cmdz {
+	#include "core/cmdz.cpp"
+}
+
 }
