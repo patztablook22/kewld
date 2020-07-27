@@ -107,7 +107,7 @@ serv::handler::~handler()
 {
 	if (core::serv.nexus.leave(this) == 0 && ready) {
 		core::serv.nexus << core::serv::msg(L"serv", L"/usrz disconn " + usr);
-		std::wcout << usr + L" disconnected" << std::endl;
+		core::log << usr + L" disconnected";
 	}
 	int sockfd = SSL_get_fd(ssl);
 	SSL_free(ssl);
@@ -123,7 +123,7 @@ void serv::handler::imma_ready()
 {
 	ready = true;
 	core::serv.nexus << core::serv::msg(L"serv", L"/usrz conn " + usr);
-	std::wcout << usr + L" connected" << std::endl;
+	core::log << usr + L" connected";
 }
 
 
@@ -138,7 +138,7 @@ void serv::handler::sniffer()
 		}
 	
 		int buf0;
-		std::wstring buf1;
+		std::wstring buf1, stg;
 		*this >> buf0;
 		usleep(1000 * core::cfg.conn_delay.gval());
 		if (buf0 != VERSION) {
@@ -147,12 +147,28 @@ void serv::handler::sniffer()
 			delete this;
 			return;
 		}
-		if (core::cfg.passwd.gval().size() != 0) {
+		*this << L"kk";
+		*this >> stg;
+		if (stg.size() < 3 || stg.size() > 15 || !iz_k(stg) || stg.find_first_of(L" /") != std::wstring::npos || stg == L"kewl" || stg == L"serv") {
+			delete this;
+			return;
+		}
+		core::usrz::usr usrdata(stg);
+		if (core::cfg.passwd.gon() || usrdata.iz_k()) {
 			for (int i = 1;; i++) {
-				*this << L"passwd";
+				*this << L"passwd " + std::wstring((usrdata.iz_k() ? L"usr" : L"serv"));
 				*this >> buf1;
-				if (buf1 == core::cfg.passwd.gval())
+				buf1.erase(0, 1);
+				if (usrdata.auth(buf1))
 					break;
+				if (buf1 == core::cfg.passwd.gval()) {
+					if (usrdata.iz_k()) {
+						*this << L"registered";
+						delete this;
+						return;
+					}
+					break;
+				}
 				usleep(1000 * core::cfg.passwd_invalid_delay.gval());
 				if (i == core::cfg.attemptz.gval()) {
 					*this << L"attemptz";
@@ -163,9 +179,10 @@ void serv::handler::sniffer()
 		}
 		*this << L"succeed";
 		*this >> buf1;
-		switch (core::serv.nexus.join(buf1, this)) {
+
+		switch (core::serv.nexus.join(stg, this)) {
 		case 0:
-			usr = buf1;
+			usr = stg;
 			*this << L"k" + usr;
 			break;
 		case 1:
@@ -198,7 +215,6 @@ void serv::handler::sniffer()
 			}
 			if (buf1.size() + usrz[i].size() > 255) {
 				*this << buf1;
-				std::wcout << L'|' << buf1 << L'|' << std::endl;
 				*this >> buf1;
 				buf1.clear();
 			} else if (buf1.size() != 0) {
@@ -206,7 +222,7 @@ void serv::handler::sniffer()
 			}
 			buf1 += usrz[i];			
 		}
-		buf1 += L',';
+		buf1 += L' ';
 		*this << buf1;
 		*this >> buf1;
 
@@ -230,14 +246,14 @@ void serv::handler::sniffer()
 		imma_ready();
 		for (;;) {
 			*this >> buf2;
-			if (buf2.gbody()[0] == L'/' && buf2.gusr() == L"kewl") {
+			if (buf2.gbody()[0] == L'/') {
 				*this << core::serv::msg(L"serv", buf2.gbody());
 			} else {
 				gettimeofday(&tmp, NULL);
 				if (1000000 * (tmp.tv_sec - tm.tv_sec) + tmp.tv_usec - tm.tv_usec >= 1000 * core::cfg.flood_delay.gval())
 					core::serv.nexus << buf2;
 				else
-					*this << core::serv::msg(L"serv", L"w8 m9... ur flooding chat!");
+					*this << core::serv::msg(L"serv", core::cfg.flood_msg.gval());
 				tm = tmp;
 			}
 		}
@@ -337,31 +353,15 @@ void serv::nexus::operator<<(msg da_msg)
 	}
 }
 
-int serv::nexus::join(std::wstring &usr, handler *da_handler)
+int serv::nexus::join(std::wstring &da_usr, handler *da_handler)
 {
 	if (connected.size() == core::cfg.clientz.gval())
 		return 1;
-	int pos;
-	for (int i = 0; pos = usr.find(','); i++) {
-		if (pos == std::wstring::npos) {
-			pos = usr.size();
-			i = 15;
-		}
-		if (pos > 15 || pos < 3 || !core::iz_k(usr.substr(0, pos)) || usr.substr(0, pos) == L"kewl" || usr.substr(0, pos) == L"serv")
-			return 3;
-		if (connected.find(usr.substr(0, pos)) == connected.end())
-			break;
-		usr.erase(0, pos + 1);
-		if (i == 15)
-			return 2;
-	}
-	if ((pos = usr.find(',')) != std::wstring::npos)
-		usr.erase(pos, usr.size() - pos);
-	if (usr.find(32) != std::wstring::npos || usr.find(10) != std::wstring::npos)
-		return 3;
+	if (connected.find(da_usr) != connected.end())
+		return 2;
 	if (connected.size() == core::cfg.clientz.gval())
 		return 1;
-	connected[usr] = da_handler;
+	connected[da_usr] = da_handler;
 	return 0;
 }
 
@@ -400,17 +400,16 @@ int serv::serve(int port, int clientz)
 	addr.sin_port = htons(port);
 
 	if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-		std::cerr << "ERR: bind failed\n";
+		core::log << L"ERR: bind failed";
 		exit(1);
 	}
 
 	if (listen(sockfd, bacclog) != 0) {
-		std::cerr << "ERR: listen failed\n";
+		core::log << L"ERR: listen failed";
 		exit(1);
 	}
 
-	std::wcout << L"serving on port " << port << L" ...YAY!\n";
-	std::wcout << L"----------------------------" << std::endl;
+	core::log << L"serving on port " + std::to_wstring(port);
 	return sockfd;
 }
 
@@ -433,15 +432,15 @@ SSL_CTX* serv::init_ctx()
 void serv::load_certificatez(const char *certfd, const char *keyfd)
 {
 	if (SSL_CTX_use_certificate_file(ctx, certfd, SSL_FILETYPE_PEM) <= 0) {
-		std::cerr << "ERR: unable to read cert file: " << certfd << '\n';
+		core::log << L"ERR: unable to read SSL cert file";
 		exit(1);
 	}
 	if (SSL_CTX_use_PrivateKey_file(ctx, keyfd, SSL_FILETYPE_PEM) <= 0) {
-		std::cerr << "ERR: unable to read key file: " << keyfd << '\n';
+		core::log << L"ERR: unable to read SSL key file";
 		exit(1);
 	}
 	if (!SSL_CTX_check_private_key(ctx)) {
-		std::cerr << "ERR: private key doesnt match the public certificate\n";
+		core::log << L"ERR: private key doesnt match the public certificate";
 		exit(1);
 	}
 }

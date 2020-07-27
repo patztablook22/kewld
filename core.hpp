@@ -1,29 +1,50 @@
 namespace core {
 
+/*********************************************************************************************/
+
 bool iz_k(wint_t);
 bool iz_k(std::wstring);
 std::wstring trim(std::wstring);
 void quit(int);
+std::wstring sha256(std::wstring);
 
 class cfg {
 public:
-	void operator<<(std::string);
-	std::string gdir();
+	void init();
 	class sub_cfg {
 	public:
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		virtual void operator<<(std::wstring) = 0;
 	};
 private:
 	std::map<std::wstring, sub_cfg *> extract;
-	std::string dir;
 public:
+	class logfd: public sub_cfg {
+	public:
+		logfd();
+		std::string gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		std::string val;
+	} logfd;
+
+	class usrz_dir: public sub_cfg {
+	public:
+		usrz_dir();
+		std::string gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		std::string val;
+	} usrz_dir;
+
 	class port: public sub_cfg {
 	public:
 		port();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
@@ -33,7 +54,7 @@ public:
 	public:
 		clientz();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
@@ -43,9 +64,11 @@ public:
 	public:
 		passwd();
 		std::wstring gval();
-		friend void cfg::operator<<(std::string);
+		bool gon();
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
+		bool on;
 		std::wstring val;
 	} passwd;
 	
@@ -53,7 +76,7 @@ public:
 	public:
 		attemptz();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
@@ -63,7 +86,7 @@ public:
 	public:
 		certfd();
 		std::string gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		std::string val;
@@ -73,7 +96,7 @@ public:
 	public:
 		keyfd();
 		std::string gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		std::string val;
@@ -83,7 +106,7 @@ public:
 	public:
 		name();
 		std::wstring gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		std::wstring val;
@@ -93,7 +116,7 @@ public:
 	public:
 		hoi_msg();
 		std::wstring gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		std::wstring val;
@@ -103,17 +126,27 @@ public:
 	public:
 		boi_msg();
 		std::wstring gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		std::wstring val;
 	} boi_msg;
 
+	class ded_msg: public sub_cfg {
+	public:
+		ded_msg();
+		std::wstring gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		std::wstring val;
+	} ded_msg;
+
 	class conn_delay: public sub_cfg {
 	public:
 		conn_delay();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
@@ -123,7 +156,7 @@ public:
 	public:
 		passwd_invalid_delay();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
@@ -133,12 +166,52 @@ public:
 	public:
 		flood_delay();
 		int gval();
-		friend void cfg::operator<<(std::string);
+		friend void cfg::init();
 	protected:
 		void operator<<(std::wstring);
 		int val;
 	} flood_delay;
+
+	class flood_msg: public sub_cfg {
+	public:
+		flood_msg();
+		std::wstring gval();
+		friend void cfg::init();
+	protected:
+		void operator<<(std::wstring);
+		std::wstring val;
+	} flood_msg;
 } cfg;
+
+/*********************************************************************************************/
+
+class log {
+public:
+	log(), ~log();
+	void init(), psss(), close();
+	void operator<<(std::wstring);
+private:
+	bool cio;
+	std::wofstream fd;
+} log;
+
+/*********************************************************************************************/
+
+class usrz {
+public:
+	void init();
+	class usr {
+	public:
+		usr(std::wstring);
+		bool iz_k();
+		bool auth(std::wstring);
+	private:
+		std::wstring nick, passwd;
+		bool k;
+	};
+} usrz;
+
+/*********************************************************************************************/
 
 class serv {
 public:
@@ -156,7 +229,6 @@ public:
 		bool valid;
 	};
 
-private:
 	class handler {
 	public:
 		handler(SSL *), ~handler();
@@ -187,7 +259,7 @@ private:
 	private:
 		std::map<std::wstring, handler *> connected;
 	} nexus;
-
+private:
 	int serve(int, int);
 	SSL_CTX *init_ctx();
 	void load_certificatez(const char *, const char *);
@@ -195,7 +267,11 @@ private:
 	int servsock;
 } serv;
 
+/*********************************************************************************************/
+
 #include "core/toolz.cpp"
 #include "core/cfg.cpp"
+#include "core/log.cpp"
+#include "core/usrz.cpp"
 #include "core/serv.cpp"
 }

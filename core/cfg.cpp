@@ -1,13 +1,12 @@
-void cfg::operator<<(std::string da_dir)
+void cfg::init()
 {
-	dir = da_dir;
 	std::wstring buf;
-	std::wifstream fd(dir + "serv.cfg");
+	std::wifstream fd("serv.cfg");
 	if (!fd.is_open()) {
-		std::cerr << "ERR: failed to read cfg file\n";
+		core::log << L"ERR: failed to open serv.cfg";
 		exit(1);
 	}
-	std::wcout << L"reading cfg file: " << std::wstring(dir.begin(), dir.end()) << "serv.cfg" << std::endl;
+	core::log << L"importing configuration from serv.cfg";
 
 	for (int line = 1; std::getline(fd, buf); line++) {
 		buf = core::trim(buf);
@@ -17,7 +16,7 @@ void cfg::operator<<(std::string da_dir)
 			continue;
 		size_t pos = buf.find(61);
 		if (pos == std::wstring::npos || pos == 0 || pos == buf.size() - 1) {
-			std::cerr << "ERR: cfg file invalid syntax: line " << line << '\n';
+			core::log << L"ERR: cfg file invalid syntax: line " + std::to_wstring(line);
 			exit(1);
 		}
 			std::wstring key(buf.begin(), buf.begin() + pos), val(buf.begin() + pos + 1, buf.end());
@@ -25,29 +24,70 @@ void cfg::operator<<(std::string da_dir)
 		val = core::trim(val);
 		
 		if (extract.find(key) == extract.end()) {
-			std::cerr << "ERR: cfg file invalid key: line " << line << '\n';
+			core::log << L"ERR: cfg file invalid key: line " + std::to_wstring(line);
 			exit(1);
 		}
 
 		try {
 			*(extract[key]) << val;
 		} catch (int err) {
-			std::clog << "ERR: cfg file ";
+			std::wstring tmp(L"ERR: cfg file ");
 			switch (err) {
 			case 0:
-				std::clog << "invalid type";
+				tmp += L"invalid type";
 				break;
 			case 1:
-				std::clog << "invalid value";
+				tmp += L"invalid value";
 				break;
 			default:
-				std::clog << "interpretation failure";
+				tmp += L"interpretation failure";
 				break;
 			}
-			std::clog << ": line " << line << std::endl;
+			tmp += L": line " + std::to_wstring(line);
+			core::log << tmp;
 			exit(1);
 		}
 	}
+}
+
+cfg::logfd::logfd()
+:val("kewld.log")
+{
+	core::cfg.extract[L"logfd"] = this;
+}
+
+std::string cfg::logfd::gval()
+{
+	return val;
+}
+
+void cfg::logfd::operator<<(std::wstring input)
+{
+	std::string tmp(input.begin(), input.end());
+	if (input.size() != tmp.size())
+		throw 1;
+	val = tmp;
+}
+
+cfg::usrz_dir::usrz_dir()
+:val("usrz/")
+{
+	core::cfg.extract[L"usrz_dir"] = this;
+}
+
+std::string cfg::usrz_dir::gval()
+{
+	return val;
+}
+
+void cfg::usrz_dir::operator<<(std::wstring input)
+{
+	std::string tmp(input.begin(), input.end());
+	if (input.size() != tmp.size())
+		throw 1;
+	val = tmp;
+	if (val[val.size() - 1] != '/')
+		val += '/';
 }
 
 cfg::port::port()
@@ -103,7 +143,7 @@ void cfg::clientz::operator<<(std::wstring input)
 }
 
 cfg::passwd::passwd()
-:val()
+:val(core::sha256(L"")), on(false)
 {
 	core::cfg.extract[L"passwd"] = this;
 }
@@ -113,11 +153,19 @@ std::wstring cfg::passwd::gval()
 	return val;
 }
 
+bool cfg::passwd::gon()
+{
+	return on;
+}
+
 void cfg::passwd::operator<<(std::wstring input)
 {
 	if(input.size() > 255 || !core::iz_k(input))
 		throw 1;
-	val = input;
+	std::wstring tmp(core::sha256(input));
+	if (tmp != val)
+		on = true;
+	val = tmp;
 }
 
 cfg::attemptz::attemptz()
@@ -154,7 +202,7 @@ cfg::certfd::certfd()
 
 std::string cfg::certfd::gval()
 {
-	return core::cfg.dir + val;
+	return val;
 }
 
 void cfg::certfd::operator<<(std::wstring input)
@@ -174,7 +222,7 @@ cfg::keyfd::keyfd()
 
 std::string cfg::keyfd::gval()
 {
-	return core::cfg.dir + val;
+	return val;
 }
 
 void cfg::keyfd::operator<<(std::wstring input)
@@ -217,7 +265,7 @@ std::wstring cfg::hoi_msg::gval()
 
 void cfg::hoi_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 255 || !iz_k(input))
+	if (input.size() > 238 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -235,7 +283,25 @@ std::wstring cfg::boi_msg::gval()
 
 void cfg::boi_msg::operator<<(std::wstring input)
 {
-	if (input.size() > 255 || !iz_k(input))
+	if (input.size() > 238 || !iz_k(input))
+		throw 1;
+	val = input;
+}
+
+cfg::ded_msg::ded_msg()
+:val()
+{
+	core::cfg.extract[L"ded_msg"] = this;
+}
+
+std::wstring cfg::ded_msg::gval()
+{
+	return val;
+}
+
+void cfg::ded_msg::operator<<(std::wstring input)
+{
+	if (input.size() > 238 || !iz_k(input))
 		throw 1;
 	val = input;
 }
@@ -316,4 +382,22 @@ void cfg::flood_delay::operator<<(std::wstring input)
 	if (tmp < 0)
 		throw 1;
 	val = tmp;
+}
+
+cfg::flood_msg::flood_msg()
+:val(L"w8 m9... ur flooding chat!")
+{
+	core::cfg.extract[L"flood_msg"] = this;
+}
+
+std::wstring cfg::flood_msg::gval()
+{
+	return val;
+}
+
+void cfg::flood_msg::operator<<(std::wstring input)
+{
+	if (input.size() > 255 || !iz_k(input))
+		throw 1;
+	val = input;
 }

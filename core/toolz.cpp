@@ -42,6 +42,61 @@ std::wstring ver_echo(int v)
 
 void quit(int)
 {
-	std::wcout << L"\nshutting down..." << std::endl;
+	core::log << L"shutting down...";
 	exit(EXIT_SUCCESS);
+}
+
+void daemonize()
+{
+	pid_t pid = fork();
+	if (pid < 0) {
+		core::log << L"ERR: forking failed";
+		exit(EXIT_FAILURE);
+	}
+
+	if (pid > 0) {
+		core::log << L"starting daemon";
+		core::log.close();
+		exit(EXIT_SUCCESS);
+	}
+	
+	if (setsid() < 0) {
+		core::log << L"SID set failed";
+		exit(EXIT_FAILURE);
+	}
+
+	core::log.psss();
+
+	signal(SIGCHLD, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+	signal(SIGTERM, quit);
+
+	pid = fork();
+	if (pid < 0) {
+		core::log << L"ERR: forking failed";
+		exit(EXIT_FAILURE);
+	}
+	if (pid > 0) {
+		core::log << L"daemon started (PID = " + std::to_wstring(pid) + L')';
+		core::log.close();
+		exit(EXIT_SUCCESS);
+	}
+}
+
+std::wstring sha256(std::wstring input)
+{
+	std::string tmp(input.begin(), input.end());
+	const char *string = tmp.c_str();
+	char outputBuffer[65];
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	SHA256_CTX sha256;
+	SHA256_Init(&sha256);
+	SHA256_Update(&sha256, string, strlen(string));
+	SHA256_Final(hash, &sha256);
+	for(int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+		sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+	}
+	outputBuffer[64] = 0;
+	tmp = outputBuffer;
+	return std::wstring(tmp.begin(), tmp.end());
 }
