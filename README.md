@@ -1,6 +1,7 @@
 # kewld
 
-Kewl daemon.
+Super kewl linux C++ IRC.
+Kewl daemon...
 
 # kewl
 
