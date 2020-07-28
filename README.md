@@ -1,7 +1,7 @@
 # kewld
 
-Super kewl linux C++ IRC.
-Kewl daemon...
+Konverzace Everybody Will Like \
+daemon
 
 # kewl
 
